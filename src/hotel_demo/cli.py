@@ -5,7 +5,7 @@ import sys
 from collections.abc import Sequence
 
 from hotel_demo.daily import daily
-from hotel_demo.pipeline import deploy, evaluate, rollback, score, train
+from hotel_demo.pipeline import deploy, evaluate, hold, rollback, score, train
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -59,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     daily_parser.add_argument("--date", required=True, help="Business date YYYY-MM-DD")
 
+    # hold
+    hold_parser = subparsers.add_parser(
+        "hold", help="Hold (quarantine) a business date, skipping scoring"
+    )
+    hold_parser.add_argument("--date", required=True, help="Business date YYYY-MM-DD")
+
     return parser
 
 
@@ -96,6 +102,10 @@ def main(args: Sequence[str] | None = None) -> int:
         elif parsed.subcommand == "daily":
             daily(date=parsed.date)
             print(f"Daily job completed for {parsed.date}")
+            return 0
+        elif parsed.subcommand == "hold":
+            hold_file = hold(date=parsed.date)
+            print(f"Held {parsed.date}: {hold_file}")
             return 0
         else:
             sys.stderr.write(f"Unknown subcommand: {parsed.subcommand}\n")

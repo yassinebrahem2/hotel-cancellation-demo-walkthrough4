@@ -7,7 +7,7 @@ from pathlib import Path
 from types import ModuleType
 
 from hotel_demo.paths import data_dir
-from hotel_demo.pipeline import score
+from hotel_demo.pipeline import is_held, score
 
 CHECKS_DIR = Path(__file__).parent / "checks"
 
@@ -54,16 +54,28 @@ def daily(date: str, *, checks_dir: Path | None = None) -> None:
         with jobs_file.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
 
-    # 1. Run score(date)
-    score_started = datetime.datetime.now(datetime.UTC).isoformat()
-    try:
-        score(date)
-        score_ended = datetime.datetime.now(datetime.UTC).isoformat()
-        _log_job("score", score_started, score_ended, "success", None)
-    except Exception as exc:
-        score_ended = datetime.datetime.now(datetime.UTC).isoformat()
-        _log_job("score", score_started, score_ended, "failure", str(exc))
-        errors.append(f"score: {exc}")
+    # Check if date is held before running score
+    if is_held(date):
+        held_msg = f"Date {date} is held, skipping score"
+        _log_job(
+            "score",
+            datetime.datetime.now(datetime.UTC).isoformat(),
+            datetime.datetime.now(datetime.UTC).isoformat(),
+            "skipped",
+            held_msg,
+        )
+        print(held_msg)
+    else:
+        # 1. Run score(date)
+        score_started = datetime.datetime.now(datetime.UTC).isoformat()
+        try:
+            score(date)
+            score_ended = datetime.datetime.now(datetime.UTC).isoformat()
+            _log_job("score", score_started, score_ended, "success", None)
+        except Exception as exc:
+            score_ended = datetime.datetime.now(datetime.UTC).isoformat()
+            _log_job("score", score_started, score_ended, "failure", str(exc))
+            errors.append(f"score: {exc}")
 
     # 2. Run dynamically discovered checks
     discovery_dir = CHECKS_DIR if checks_dir is None else checks_dir
