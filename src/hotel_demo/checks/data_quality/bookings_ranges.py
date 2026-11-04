@@ -7,7 +7,6 @@ import pandas as pd
 
 from hotel_demo.paths import data_dir
 
-
 CHECK_NAME = "bookings_ranges"
 GRACE_DAYS = 2
 
@@ -55,7 +54,9 @@ def run(date: str) -> dict[str, Any]:
         if not found:
             fired = True
             value = 1.0
-            detail = {"error": f"No bookings file found for {date} or within {GRACE_DAYS} days grace"}
+            detail = {
+                "error": f"No bookings file found for {date} or within {GRACE_DAYS} days grace"
+            }
         else:
             df = pd.read_parquet(booking_file)
             fired, value, detail = _check_ranges(df, booking_file.name, d)
@@ -83,12 +84,15 @@ def run(date: str) -> dict[str, Any]:
     res_file = res_dir / f"{date}.jsonl"
     with res_file.open("a", encoding="utf-8") as f:
         import json
+
         f.write(json.dumps(record) + "\n")
 
     return record
 
 
-def _check_ranges(df: pd.DataFrame, filename: str, grace_days: int) -> tuple[bool, float, dict[str, Any]]:
+def _check_ranges(
+    df: pd.DataFrame, filename: str, grace_days: int
+) -> tuple[bool, float, dict[str, Any]]:
     """Check value ranges for numeric columns."""
     violations = []
     range_info = {}
@@ -107,10 +111,14 @@ def _check_ranges(df: pd.DataFrame, filename: str, grace_days: int) -> tuple[boo
                 range_info[col] = {
                     "expected_min": min_val,
                     "expected_max": max_val,
-                    "actual_min": float(actual_min) if pd.api.types.is_numeric_dtype(non_null) else str(actual_min),
-                    "actual_max": float(actual_max) if pd.api.types.is_numeric_dtype(non_null) else str(actual_max),
+                    "actual_min": float(actual_min)
+                    if pd.api.types.is_numeric_dtype(non_null)
+                    else str(actual_min),
+                    "actual_max": float(actual_max)
+                    if pd.api.types.is_numeric_dtype(non_null)
+                    else str(actual_max),
                     "out_of_range_count": int(out_count),
-                    "non_null_count": int(len(non_null)),
+                    "non_null_count": len(non_null),
                 }
 
                 if out_count > 0:

@@ -5,9 +5,8 @@ from typing import Any
 
 import pandas as pd
 
-from hotel_demo.paths import data_dir
 from hotel_demo.features import BOOKING_COLUMNS
-
+from hotel_demo.paths import data_dir
 
 CHECK_NAME = "bookings_schema"
 GRACE_DAYS = 2
@@ -78,7 +77,9 @@ def run(date: str) -> dict[str, Any]:
         if not found:
             fired = True
             value = 1.0  # schema violation
-            detail = {"error": f"No bookings file found for {date} or within {GRACE_DAYS} days grace"}
+            detail = {
+                "error": f"No bookings file found for {date} or within {GRACE_DAYS} days grace"
+            }
         else:
             df = pd.read_parquet(booking_file)
             fired, value, detail = _validate_schema(df, booking_file.name, d)
@@ -106,12 +107,15 @@ def run(date: str) -> dict[str, Any]:
     res_file = res_dir / f"{date}.jsonl"
     with res_file.open("a", encoding="utf-8") as f:
         import json
+
         f.write(json.dumps(record) + "\n")
 
     return record
 
 
-def _validate_schema(df: pd.DataFrame, filename: str, grace_days: int) -> tuple[bool, float, dict[str, Any]]:
+def _validate_schema(
+    df: pd.DataFrame, filename: str, grace_days: int
+) -> tuple[bool, float, dict[str, Any]]:
     """Validate schema of bookings DataFrame."""
     violations = []
     actual_columns = set(df.columns)

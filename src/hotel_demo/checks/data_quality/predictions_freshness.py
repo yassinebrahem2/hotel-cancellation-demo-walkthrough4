@@ -7,7 +7,6 @@ import pandas as pd
 
 from hotel_demo.paths import data_dir
 
-
 CHECK_NAME = "predictions_freshness"
 THRESHOLD_MIN_ROWS = 1
 GRACE_DAYS = 2
@@ -39,7 +38,9 @@ def run(date: str) -> dict[str, Any]:
         if not found:
             fired = True
             value = 0
-            detail = {"error": f"No predictions file found for {date} or within {GRACE_DAYS} days grace"}
+            detail = {
+                "error": f"No predictions file found for {date} or within {GRACE_DAYS} days grace"
+            }
         else:
             df = pd.read_parquet(pred_file)
             row_count = len(df)
@@ -73,6 +74,7 @@ def run(date: str) -> dict[str, Any]:
     res_file = res_dir / f"{date}.jsonl"
     with res_file.open("a", encoding="utf-8") as f:
         import json
+
         f.write(json.dumps(record) + "\n")
 
     return record
