@@ -41,69 +41,113 @@ def run(date: str) -> dict[str, Any]:
     Fires if no evaluation exists or it's older than MAX_AGE_DAYS.
     Never raises — returns a fired result on any error.
     """
-    ran_at = datetime.datetime.now(datetime.UTC).isoformat()
-
-    mlflow.set_tracking_uri(tracking_uri())
-    client = MlflowClient()
-
     try:
-        # Get the production model version
-        mv = client.get_model_version_by_alias(MODEL_NAME, MODEL_ALIAS)
-        version = mv.version
-        run_id = mv.run_id
-    except mlflow.exceptions.MlflowException:
-        return _write_agent_results_line(
-            date,
-            {
-                "check_id": CHECK_NAME,
-                "origin": "agent",
-                "ran_at": ran_at,
-                "fired": True,
-                "value": None,
-                "threshold": MAX_AGE_DAYS,
-                "category": "operational",
-                "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
-                "model": "hotel-cancellation",
-                "detail": {"reason": "no production alias", "version": None},
-                "source_ref": "checks/missing_evaluation.py",
-                "version": None,
-                "not_enough_data": False,
-            },
-        )
+        ran_at = datetime.datetime.now(datetime.UTC).isoformat()
 
-    # Check for evaluation artifact
-    eval_artifact_path = "mlops_agents/evaluation.json"
-    artifacts = client.list_artifacts(run_id, path=eval_artifact_path)
+        mlflow.set_tracking_uri(tracking_uri())
+        client = MlflowClient()
 
-    if not artifacts:
-        return _write_agent_results_line(
-            date,
-            {
-                "check_id": CHECK_NAME,
-                "origin": "agent",
-                "ran_at": ran_at,
-                "fired": True,
-                "value": None,
-                "threshold": MAX_AGE_DAYS,
-                "category": "operational",
-                "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
-                "model": "hotel-cancellation",
-                "detail": {
-                    "reason": "no evaluation artifact",
-                    "version": version,
-                    "run_id": run_id,
+        try:
+            # Get the production model version
+            mv = client.get_model_version_by_alias(MODEL_NAME, MODEL_ALIAS)
+            version = mv.version
+            run_id = mv.run_id
+        except mlflow.exceptions.MlflowException:
+            return _write_agent_results_line(
+                date,
+                {
+                    "check_id": CHECK_NAME,
+                    "origin": "agent",
+                    "ran_at": ran_at,
+                    "fired": True,
+                    "value": None,
+                    "threshold": MAX_AGE_DAYS,
+                    "category": "operational",
+                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "model": "hotel-cancellation",
+                    "detail": {"reason": "no production alias", "version": None},
+                    "source_ref": "checks/missing_evaluation.py",
+                    "version": None,
+                    "not_enough_data": False,
                 },
-                "source_ref": "checks/missing_evaluation.py",
-                "version": None,
-                "not_enough_data": False,
-            },
-        )
+            )
 
-    # Download and parse the evaluation artifact to check its timestamp
-    try:
-        local_path = client.download_artifacts(run_id, eval_artifact_path)
-        with Path(local_path).open() as f:
-            eval_data = json.load(f)
+        # Check for evaluation artifact
+        eval_artifact_path = "mlops_agents/evaluation.json"
+        try:
+            artifacts = client.list_artifacts(run_id, path=eval_artifact_path)
+        except Exception as e:
+            return _write_agent_results_line(
+                date,
+                {
+                    "check_id": CHECK_NAME,
+                    "origin": "agent",
+                    "ran_at": ran_at,
+                    "fired": True,
+                    "value": None,
+                    "threshold": MAX_AGE_DAYS,
+                    "category": "operational",
+                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "model": "hotel-cancellation",
+                    "detail": {"reason": f"error listing artifacts: {e}"},
+                    "source_ref": "checks/missing_evaluation.py",
+                    "version": None,
+                    "not_enough_data": False,
+                },
+            )
+
+        if not artifacts:
+            return _write_agent_results_line(
+                date,
+                {
+                    "check_id": CHECK_NAME,
+                    "origin": "agent",
+                    "ran_at": ran_at,
+                    "fired": True,
+                    "value": None,
+                    "threshold": MAX_AGE_DAYS,
+                    "category": "operational",
+                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "model": "hotel-cancellation",
+                    "detail": {
+                        "reason": "no evaluation artifact",
+                        "version": version,
+                        "run_id": run_id,
+                    },
+                    "source_ref": "checks/missing_evaluation.py",
+                    "version": None,
+                    "not_enough_data": False,
+                },
+            )
+
+        # Download and parse the evaluation artifact to check its timestamp
+        try:
+            local_path = client.download_artifacts(run_id, eval_artifact_path)
+            with Path(local_path).open() as f:
+                eval_data = json.load(f)
+        except Exception as e:
+            return _write_agent_results_line(
+                date,
+                {
+                    "check_id": CHECK_NAME,
+                    "origin": "agent",
+                    "ran_at": ran_at,
+                    "fired": True,
+                    "value": None,
+                    "threshold": MAX_AGE_DAYS,
+                    "category": "operational",
+                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "model": "hotel-cancellation",
+                    "detail": {
+                        "reason": f"error reading evaluation artifact: {e}",
+                        "version": version,
+                        "run_id": run_id,
+                    },
+                    "source_ref": "checks/missing_evaluation.py",
+                    "version": None,
+                    "not_enough_data": False,
+                },
+            )
 
         eval_time_str = eval_data.get("evaluated_at") or eval_data.get("ran_at")
         if not eval_time_str:
@@ -130,8 +174,32 @@ def run(date: str) -> dict[str, Any]:
                 },
             )
 
-        eval_time = datetime.datetime.fromisoformat(eval_time_str.replace("Z", "+00:00"))
-        age_days = (datetime.datetime.now(datetime.UTC) - eval_time).days
+        try:
+            eval_time = datetime.datetime.fromisoformat(eval_time_str.replace("Z", "+00:00"))
+            age_days = (datetime.datetime.now(datetime.UTC) - eval_time).days
+        except Exception as e:
+            return _write_agent_results_line(
+                date,
+                {
+                    "check_id": CHECK_NAME,
+                    "origin": "agent",
+                    "ran_at": ran_at,
+                    "fired": True,
+                    "value": None,
+                    "threshold": MAX_AGE_DAYS,
+                    "category": "operational",
+                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "model": "hotel-cancellation",
+                    "detail": {
+                        "reason": f"error parsing evaluation timestamp: {e}",
+                        "version": version,
+                        "run_id": run_id,
+                    },
+                    "source_ref": "checks/missing_evaluation.py",
+                    "version": None,
+                    "not_enough_data": False,
+                },
+            )
 
         if age_days > MAX_AGE_DAYS:
             return _write_agent_results_line(
@@ -176,8 +244,9 @@ def run(date: str) -> dict[str, Any]:
                 "not_enough_data": False,
             },
         )
-
     except Exception as e:
+        # Ultimate fallback — never let this check crash daily()
+        ran_at = datetime.datetime.now(datetime.UTC).isoformat()
         return _write_agent_results_line(
             date,
             {
@@ -190,11 +259,7 @@ def run(date: str) -> dict[str, Any]:
                 "category": "operational",
                 "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
                 "model": "hotel-cancellation",
-                "detail": {
-                    "reason": f"error reading evaluation: {e}",
-                    "version": version,
-                    "run_id": run_id,
-                },
+                "detail": {"reason": f"unexpected error: {e}"},
                 "source_ref": "checks/missing_evaluation.py",
                 "version": None,
                 "not_enough_data": False,
