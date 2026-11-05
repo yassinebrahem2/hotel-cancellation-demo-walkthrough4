@@ -22,7 +22,7 @@ RANGES = {
     "babies": (0, 10),
     "is_repeated_guest": (0, 1),
     "previous_cancellations": (0, 26),
-    "previous_bookings_not_canceled": (0, 38),
+    "previous_bookings_not_canceled": (0, 40),
     "booking_changes": (0, 0),  # all zeros in data
     "adr": (0.0, 5400.0),
     "total_of_special_requests": (0, 5),
