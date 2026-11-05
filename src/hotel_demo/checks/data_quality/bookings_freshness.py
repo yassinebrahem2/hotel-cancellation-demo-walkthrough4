@@ -64,7 +64,7 @@ def run(date: str) -> dict[str, Any]:
         "category": "data_quality",
         "subject": "hotel-data.bookings",
         "detail": detail,
-        "source_ref": "src/hotel_demo/checks/bookings_freshness.py",
+        "source_ref": "src/hotel_demo/checks/data_quality/bookings_freshness.py",
         "not_enough_data": False,
     }
 
