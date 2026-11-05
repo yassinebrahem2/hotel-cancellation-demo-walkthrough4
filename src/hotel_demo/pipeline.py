@@ -220,6 +220,19 @@ def evaluate(version: int | str, threshold: float = 0.5) -> dict[str, float]:
     for k, v in metrics.items():
         client.log_metric(mv.run_id, k, v)
 
+    # Write evaluation artifact as required by handoff and missing_evaluation check
+    eval_artifact = {
+        "model_name": MODEL_NAME,
+        "model_version": str(version),
+        "run_id": mv.run_id,
+        "metrics": metrics,
+        "evaluated_at": datetime.datetime.now(datetime.UTC).isoformat(),
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+        json.dump(eval_artifact, tmp)
+        tmp_path = tmp.name
+    client.log_artifact(mv.run_id, tmp_path, artifact_path="mlops_agents")
+
     return metrics
 
 
