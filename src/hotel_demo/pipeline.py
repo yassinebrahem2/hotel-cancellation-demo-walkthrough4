@@ -229,10 +229,11 @@ def evaluate(version: int | str, threshold: float = 0.5) -> dict[str, float]:
         "metrics": metrics,
         "evaluated_at": datetime.datetime.now(datetime.UTC).isoformat(),
     }
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
-        json.dump(eval_artifact, tmp)
-        tmp_path = tmp.name
-    client.log_artifact(mv.run_id, tmp_path, artifact_path="mlops_agents")
+    # The file name is the artifact's name: the app and the check read mlops_agents/evaluation.json.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / "evaluation.json"
+        tmp_path.write_text(json.dumps(eval_artifact), encoding="utf-8")
+        client.log_artifact(mv.run_id, str(tmp_path), artifact_path="mlops_agents")
 
     return metrics
 
