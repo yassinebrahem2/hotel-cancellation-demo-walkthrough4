@@ -8,6 +8,7 @@ from hotel_demo.paths import data_dir
 
 CHECK_NAME = "missing_predictions"
 MIN_SAMPLE = 1  # minimum predictions expected for a business date
+DEPLOY_STAGE_OUTPUT = "mlflow_model"
 
 
 def _write_agent_results_line(date: str, record: dict[str, Any]) -> dict[str, Any]:
@@ -52,9 +53,13 @@ def run(date: str) -> dict[str, Any]:
                 "value": 0,
                 "threshold": MIN_SAMPLE,
                 "category": "operational",
-                "subject": f"predictions for {date}",
+                "subject": DEPLOY_STAGE_OUTPUT,
                 "model": "hotel-cancellation",
-                "detail": {"reason": "no predictions file", "total_predictions": 0},
+                "detail": {
+                    "reason": "no predictions file",
+                    "total_predictions": 0,
+                    "business_date": date,
+                },
                 "source_ref": "checks/missing_predictions.py",
                 "version": None,
                 "not_enough_data": False,
@@ -77,9 +82,13 @@ def run(date: str) -> dict[str, Any]:
                 "value": None,
                 "threshold": MIN_SAMPLE,
                 "category": "operational",
-                "subject": f"predictions for {date}",
+                "subject": DEPLOY_STAGE_OUTPUT,
                 "model": "hotel-cancellation",
-                "detail": {"reason": f"error reading predictions: {e}", "total_predictions": None},
+                "detail": {
+                    "reason": f"error reading predictions: {e}",
+                    "total_predictions": None,
+                    "business_date": date,
+                },
                 "source_ref": "checks/missing_predictions.py",
                 "version": None,
                 "not_enough_data": False,
@@ -97,9 +106,13 @@ def run(date: str) -> dict[str, Any]:
                 "value": total,
                 "threshold": MIN_SAMPLE,
                 "category": "operational",
-                "subject": f"predictions for {date}",
+                "subject": DEPLOY_STAGE_OUTPUT,
                 "model": "hotel-cancellation",
-                "detail": {"reason": "below minimum sample", "total_predictions": total},
+                "detail": {
+                    "reason": "below minimum sample",
+                    "total_predictions": total,
+                    "business_date": date,
+                },
                 "source_ref": "checks/missing_predictions.py",
                 "version": None,
                 "not_enough_data": True,
@@ -116,9 +129,9 @@ def run(date: str) -> dict[str, Any]:
             "value": total,
             "threshold": MIN_SAMPLE,
             "category": "operational",
-            "subject": f"predictions for {date}",
+            "subject": DEPLOY_STAGE_OUTPUT,
             "model": "hotel-cancellation",
-            "detail": {"total_predictions": total},
+            "detail": {"total_predictions": total, "business_date": date},
             "source_ref": "checks/missing_predictions.py",
             "version": None,
             "not_enough_data": False,

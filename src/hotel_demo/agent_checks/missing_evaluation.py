@@ -13,6 +13,7 @@ from hotel_demo.paths import data_dir, tracking_uri
 
 CHECK_NAME = "missing_evaluation"
 MAX_AGE_DAYS = 7  # evaluation older than this is considered stale
+DEPLOY_STAGE_OUTPUT = "mlflow_model"
 
 
 def _write_agent_results_line(date: str, record: dict[str, Any]) -> dict[str, Any]:
@@ -63,7 +64,7 @@ def run(date: str) -> dict[str, Any]:
                     "value": None,
                     "threshold": MAX_AGE_DAYS,
                     "category": "operational",
-                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "subject": DEPLOY_STAGE_OUTPUT,
                     "model": "hotel-cancellation",
                     "detail": {"reason": "no production alias", "version": None},
                     "source_ref": "checks/missing_evaluation.py",
@@ -107,7 +108,7 @@ def run(date: str) -> dict[str, Any]:
                     "value": None,
                     "threshold": MAX_AGE_DAYS,
                     "category": "operational",
-                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "subject": DEPLOY_STAGE_OUTPUT,
                     "model": "hotel-cancellation",
                     "detail": {
                         "reason": "no evaluation artifact",
@@ -136,7 +137,7 @@ def run(date: str) -> dict[str, Any]:
                     "value": None,
                     "threshold": MAX_AGE_DAYS,
                     "category": "operational",
-                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "subject": DEPLOY_STAGE_OUTPUT,
                     "model": "hotel-cancellation",
                     "detail": {
                         "reason": f"error reading evaluation artifact: {e}",
@@ -188,7 +189,7 @@ def run(date: str) -> dict[str, Any]:
                     "value": None,
                     "threshold": MAX_AGE_DAYS,
                     "category": "operational",
-                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "subject": DEPLOY_STAGE_OUTPUT,
                     "model": "hotel-cancellation",
                     "detail": {
                         "reason": f"error parsing evaluation timestamp: {e}",
@@ -212,7 +213,7 @@ def run(date: str) -> dict[str, Any]:
                     "value": age_days,
                     "threshold": MAX_AGE_DAYS,
                     "category": "operational",
-                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "subject": DEPLOY_STAGE_OUTPUT,
                     "model": "hotel-cancellation",
                     "detail": {
                         "reason": "evaluation stale",
@@ -236,7 +237,7 @@ def run(date: str) -> dict[str, Any]:
                 "value": age_days,
                 "threshold": MAX_AGE_DAYS,
                 "category": "operational",
-                "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                "subject": DEPLOY_STAGE_OUTPUT,
                 "model": "hotel-cancellation",
                 "detail": {"age_days": age_days, "version": version, "evaluated_at": eval_time_str},
                 "source_ref": "checks/missing_evaluation.py",
@@ -257,7 +258,7 @@ def run(date: str) -> dict[str, Any]:
                 "value": None,
                 "threshold": MAX_AGE_DAYS,
                 "category": "operational",
-                "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                "subject": DEPLOY_STAGE_OUTPUT,
                 "model": "hotel-cancellation",
                 "detail": {"reason": f"unexpected error: {e}"},
                 "source_ref": "checks/missing_evaluation.py",
