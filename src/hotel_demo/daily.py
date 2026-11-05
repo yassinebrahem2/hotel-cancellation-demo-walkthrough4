@@ -10,6 +10,7 @@ from hotel_demo.paths import data_dir
 from hotel_demo.pipeline import is_held, score
 
 CHECKS_DIR = Path(__file__).parent / "checks"
+AGENT_CHECKS_DIR = Path(__file__).parent / "agent_checks"
 
 
 def _load_check(py_file: Path) -> ModuleType:
@@ -23,10 +24,18 @@ def _load_check(py_file: Path) -> ModuleType:
     return mod
 
 
+def _discover_check_files(discovery_dir: Path) -> list[Path]:
+    """Return sorted .py files in discovery_dir, recursively, excluding __init__."""
+    if not discovery_dir.exists():
+        return []
+    return sorted(f for f in discovery_dir.rglob("*.py") if f.name != "__init__.py")
+
+
 def daily(date: str, *, checks_dir: Path | None = None) -> None:
     """Run the daily scoring job and all legacy monitoring checks for date.
 
-    Checks are discovered from checks_dir (default: the package's checks directory).
+    Checks are discovered from checks_dir (default: the package's checks directory
+    plus agent_checks subdirectory). Recursively discovers checks in subfolders.
     Logs execution of each job to data_dir() / "jobs" / f"{date}.jsonl".
     Raises RuntimeError if any step (score or any check) fails.
     """
@@ -77,12 +86,17 @@ def daily(date: str, *, checks_dir: Path | None = None) -> None:
             _log_job("score", score_started, score_ended, "failure", str(exc))
             errors.append(f"score: {exc}")
 
-    # 2. Run dynamically discovered checks
-    discovery_dir = CHECKS_DIR if checks_dir is None else checks_dir
-    if discovery_dir.exists():
-        for py_file in sorted(discovery_dir.glob("*.py")):
-            if py_file.stem == "__init__":
-                continue
+    # 2. Run dynamically discovered checks (checks/ + agent_checks/)
+    discovery_dirs: list[Path] = []
+    if checks_dir is not None:
+        discovery_dirs.append(checks_dir)
+    else:
+        discovery_dirs.append(CHECKS_DIR)
+        if AGENT_CHECKS_DIR.exists():
+            discovery_dirs.append(AGENT_CHECKS_DIR)
+
+    for discovery_dir in discovery_dirs:
+        for py_file in _discover_check_files(discovery_dir):
             job_name = py_file.stem
             chk_started = datetime.datetime.now(datetime.UTC).isoformat()
             try:
