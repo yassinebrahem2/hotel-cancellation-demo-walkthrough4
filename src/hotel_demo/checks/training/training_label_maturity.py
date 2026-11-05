@@ -89,7 +89,9 @@ def run(date: str) -> dict[str, Any]:
     n_total_labels = len(labels)
 
     # Join on booking_id (same as train)
-    merged = bookings.merge(labels[["booking_id", "is_canceled", "booking_changes"]], on="booking_id", how="inner")
+    merged = bookings.merge(
+        labels[["booking_id", "is_canceled", "booking_changes"]], on="booking_id", how="inner"
+    )
     n_merged = len(merged)
 
     if n_merged < MIN_SAMPLE:
@@ -143,7 +145,9 @@ def main() -> None:
     date = sys.argv[1]
     result = run(date)
     _write_agent_result(date, result)
-    print(f"{CHECK_NAME}: {'FIRED' if result['fired'] else 'OK'} (immature_labels={result['value']}, threshold={result['threshold']})")
+    print(
+        f"{CHECK_NAME}: {'FIRED' if result['fired'] else 'OK'} (immature_labels={result['value']}, threshold={result['threshold']})"
+    )
 
 
 if __name__ == "__main__":

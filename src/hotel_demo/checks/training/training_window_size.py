@@ -79,7 +79,9 @@ def run(date: str) -> dict[str, Any]:
     labels = labels[labels["label_date"] <= check_date]
 
     # Join on booking_id (same as train)
-    merged = bookings.merge(labels[["booking_id", "is_canceled", "booking_changes"]], on="booking_id", how="inner")
+    merged = bookings.merge(
+        labels[["booking_id", "is_canceled", "booking_changes"]], on="booking_id", how="inner"
+    )
 
     n_samples = len(merged)
 
@@ -94,8 +96,8 @@ def run(date: str) -> dict[str, Any]:
         "category": "data_quality",
         "subject": "training_window",
         "detail": {
-            "n_bookings_before_cutoff": int(len(bookings)),
-            "n_labels_before_cutoff": int(len(labels)),
+            "n_bookings_before_cutoff": len(bookings),
+            "n_labels_before_cutoff": len(labels),
             "n_merged": int(n_samples),
         },
         "source_ref": "src/hotel_demo/checks/training_window_size.py",
@@ -113,7 +115,9 @@ def main() -> None:
     date = sys.argv[1]
     result = run(date)
     _write_agent_result(date, result)
-    print(f"{CHECK_NAME}: {'FIRED' if result['fired'] else 'OK'} (value={result['value']}, threshold={result['threshold']})")
+    print(
+        f"{CHECK_NAME}: {'FIRED' if result['fired'] else 'OK'} (value={result['value']}, threshold={result['threshold']})"
+    )
 
 
 if __name__ == "__main__":
