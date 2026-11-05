@@ -76,7 +76,12 @@ def run(date: str) -> dict[str, Any]:
         # Check for evaluation artifact
         eval_artifact_path = "mlops_agents/evaluation.json"
         try:
-            artifacts = client.list_artifacts(run_id, path=eval_artifact_path)
+            # list_artifacts lists a folder; a file path lists nothing, so look in its folder.
+            artifacts = [
+                a
+                for a in client.list_artifacts(run_id, path="mlops_agents")
+                if a.path == eval_artifact_path
+            ]
         except Exception as e:
             return _write_agent_results_line(
                 date,
