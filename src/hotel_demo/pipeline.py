@@ -267,6 +267,9 @@ def score(date: str) -> Path:
     Requires exactly the 27 booking columns in order. Writes predictions atomically
     to data_dir() / "predictions" / f"{date}.parquet".
     """
+    if is_held(date):
+        raise RuntimeError(f"Date {date} is held, skipping score")
+
     b_file = data_dir() / "bookings" / f"{date}.parquet"
     if not b_file.exists():
         raise FileNotFoundError(f"Bookings file not found: {b_file}")
@@ -323,3 +326,24 @@ def score(date: str) -> Path:
             temp_file.unlink(missing_ok=True)
 
     return target_file
+
+
+def hold(date: str) -> Path:
+    """Mark a business date as held (quarantined), skipping scoring for that date.
+
+    Creates a hold marker file at data_dir() / "holds" / f"{date}.hold".
+    Returns the path to the created hold file.
+    """
+    hold_dir = data_dir() / "holds"
+    hold_dir.mkdir(parents=True, exist_ok=True)
+    hold_file = hold_dir / f"{date}.hold"
+    hold_file.write_text(
+        f"held_at={datetime.datetime.now(datetime.UTC).isoformat()}\n", encoding="utf-8"
+    )
+    return hold_file
+
+
+def is_held(date: str) -> bool:
+    """Check if a business date is held (quarantined)."""
+    hold_file = data_dir() / "holds" / f"{date}.hold"
+    return hold_file.exists()

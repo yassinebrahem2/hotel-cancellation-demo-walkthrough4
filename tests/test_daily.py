@@ -97,7 +97,18 @@ def test_daily_default_discovery_runs_the_three_legacy_checks(daily_env):
     jobs_file = data_dir() / "jobs" / "2026-01-11.jsonl"
     with jobs_file.open("r", encoding="utf-8") as f:
         jobs_run = [json.loads(line)["job"] for line in f if line.strip()]
-    assert sorted(jobs_run) == ["accuracy", "cancellation_rate", "drift", "score"]
+    # Every check runs: checks/ with its subfolders, and agent_checks/.
+    assert {
+        "accuracy",
+        "cancellation_rate",
+        "drift",
+        "missing_evaluation",
+        "missing_predictions",
+        "bookings_nulls",
+        "bookings_schema",
+        "training_window_size",
+        "score",
+    } <= set(jobs_run)
     assert _check_files(CHECKS_DIR) == listing_before
 
     mon_file = data_dir() / "monitoring" / "2026-01-11.jsonl"
@@ -161,6 +172,38 @@ def run(date: str) -> dict[str, Any]:
         jobs_run = [json.loads(line)["job"] for line in f if line.strip()]
     assert "custom_test_check" in jobs_run
     assert _check_files(CHECKS_DIR) == listing_before
+
+
+def test_daily_dynamic_check_discovery_subfolder(daily_env, checks_copy):
+    """Verify daily discovers checks in subfolders of checks/."""
+    subfolder = checks_copy / "subfolder"
+    subfolder.mkdir()
+    subfolder_check = subfolder / "subfolder_check.py"
+    subfolder_check.write_text(
+        "from typing import Any\n"
+        "from hotel_demo.monitoring import write_monitoring_line\n\n"
+        'CHECK_NAME = "subfolder_check"\n\n'
+        "def run(date: str) -> dict[str, Any]:\n"
+        "    record = {\n"
+        '        "check": CHECK_NAME,\n'
+        '        "fired": False,\n'
+        '        "value": 1.0,\n'
+        '        "threshold": 10.0,\n'
+        '        "detail": {},\n'
+        "    }\n"
+        "    return write_monitoring_line(date, record)\n",
+        encoding="utf-8",
+    )
+
+    daily("2026-01-11", checks_dir=checks_copy)
+
+    mon_file = data_dir() / "monitoring" / "2026-01-11.jsonl"
+    mon_lines = [json.loads(line) for line in mon_file.open() if line.strip()]
+    assert any(line["check"] == "subfolder_check" for line in mon_lines)
+
+    jobs_file = data_dir() / "jobs" / "2026-01-11.jsonl"
+    jobs = [json.loads(line) for line in jobs_file.open() if line.strip()]
+    assert any(j["job"] == "subfolder_check" for j in jobs)
 
 
 def test_daily_check_file_import_error_logs_failed_job_and_runs_others(daily_env, checks_copy):
