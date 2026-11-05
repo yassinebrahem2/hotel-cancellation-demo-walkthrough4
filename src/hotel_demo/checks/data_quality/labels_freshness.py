@@ -1,4 +1,4 @@
-"""Bookings data freshness check."""
+"""Labels data freshness check."""
 
 import datetime
 from typing import Any
@@ -7,52 +7,50 @@ import pandas as pd
 
 from hotel_demo.paths import data_dir
 
-CHECK_NAME = "bookings_freshness"
-THRESHOLD_MIN_ROWS = 10
+CHECK_NAME = "labels_freshness"
+THRESHOLD_MIN_ROWS = 1
 GRACE_DAYS = 2
 
 
 def run(date: str) -> dict[str, Any]:
-    """Run the bookings freshness check for the given date.
+    """Run the labels freshness check for the given date.
 
-    Checks that a bookings parquet file exists for the given date (booking_date)
+    Checks that a labels parquet file exists for the given label_date
     and contains at least THRESHOLD_MIN_ROWS rows. Allows GRACE_DAYS of lag.
 
     Appends the result record to data_dir() / "agent-results" / f"{date}.jsonl".
     """
     target_date = datetime.date.fromisoformat(date)
-    b_dir = data_dir() / "bookings"
-    booking_file = b_dir / f"{date}.parquet"
+    l_dir = data_dir() / "labels"
+    label_file = l_dir / f"{date}.parquet"
 
-    if not booking_file.exists():
+    if not label_file.exists():
         # Check grace period
         found = False
         for d in range(1, GRACE_DAYS + 1):
             check_date = target_date - datetime.timedelta(days=d)
-            check_file = b_dir / f"{check_date.isoformat()}.parquet"
+            check_file = l_dir / f"{check_date.isoformat()}.parquet"
             if check_file.exists():
-                booking_file = check_file
+                label_file = check_file
                 found = True
                 break
 
         if not found:
             fired = True
             value = 0
-            detail = {
-                "error": f"No bookings file found for {date} or within {GRACE_DAYS} days grace"
-            }
+            detail = {"error": f"No labels file found for {date} or within {GRACE_DAYS} days grace"}
         else:
-            df = pd.read_parquet(booking_file)
+            df = pd.read_parquet(label_file)
             row_count = len(df)
             fired = row_count < THRESHOLD_MIN_ROWS
             value = row_count
-            detail = {"file": booking_file.name, "rows": row_count, "grace_days_used": d}
+            detail = {"file": label_file.name, "rows": row_count, "grace_days_used": d}
     else:
-        df = pd.read_parquet(booking_file)
+        df = pd.read_parquet(label_file)
         row_count = len(df)
         fired = row_count < THRESHOLD_MIN_ROWS
         value = row_count
-        detail = {"file": booking_file.name, "rows": row_count, "grace_days_used": 0}
+        detail = {"file": label_file.name, "rows": row_count, "grace_days_used": 0}
 
     record = {
         "check_id": CHECK_NAME,
@@ -62,9 +60,9 @@ def run(date: str) -> dict[str, Any]:
         "value": float(value),
         "threshold": float(THRESHOLD_MIN_ROWS),
         "category": "data_quality",
-        "subject": "hotel-data.bookings",
+        "subject": "hotel-data.labels",
         "detail": detail,
-        "source_ref": "src/hotel_demo/checks/bookings_freshness.py",
+        "source_ref": "src/hotel_demo/checks/data_quality/labels_freshness.py",
         "not_enough_data": False,
     }
 
