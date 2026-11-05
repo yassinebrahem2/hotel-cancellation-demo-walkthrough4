@@ -7,16 +7,20 @@ deposit_type, customer_type, distribution_channel.
 import datetime
 from typing import Any
 
-import pandas as pd
-import numpy as np
-
-from hotel_demo.features import FEATURES
-from hotel_demo.monitoring import write_agent_result_line
-from hotel_demo.paths import data_dir, tracking_uri
 import mlflow
+import numpy as np
+import pandas as pd
 from mlflow.tracking import MlflowClient
 
+from hotel_demo.monitoring import write_agent_result_line
+from hotel_demo.paths import data_dir, tracking_uri
+
 CHECK_NAME = "categorical_drift"
+CHECK_ID = "categorical_drift"
+CATEGORY = "drift"
+SUBJECT = "hotel-cancellation v1"
+MODEL = "hotel-cancellation"
+SOURCE_REF = "src/hotel_demo/agent_checks/categorical_drift.py"
 THRESHOLD = 0.2  # PSI > 0.2 indicates significant drift
 MIN_SAMPLES = 30  # minimum samples per category per window
 
@@ -76,8 +80,7 @@ def _load_training_distributions() -> dict[str, pd.Series]:
         return {}
 
     # Get the run that produced this model version
-    mv = client.get_model_version("hotel-cancellation", model_version)
-    run_id = mv.run_id
+    client.get_model_version("hotel-cancellation", model_version)
 
     # Try to load training data distributions from the run artifacts
     # We'll compute from the training data directly as a fallback
@@ -95,12 +98,16 @@ def _load_serving_window(date: str, window_days: int = 7) -> pd.DataFrame:
         return pd.DataFrame()
 
     all_bookings = pd.concat(
-        [pd.read_parquet(f, columns=["booking_date"] + CATEGORICAL_FEATURES) for f in booking_files],
+        [
+            pd.read_parquet(f, columns=["booking_date", *CATEGORICAL_FEATURES])
+            for f in booking_files
+        ],
         ignore_index=True,
     )
     all_bookings["booking_date_dt"] = pd.to_datetime(all_bookings["booking_date"]).dt.date
     window_bookings = all_bookings[
-        (all_bookings["booking_date_dt"] >= start_date) & (all_bookings["booking_date_dt"] <= curr_date)
+        (all_bookings["booking_date_dt"] >= start_date)
+        & (all_bookings["booking_date_dt"] <= curr_date)
     ].copy()
 
     return window_bookings
@@ -115,7 +122,10 @@ def _load_training_data(cutoff_date: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     all_bookings = pd.concat(
-        [pd.read_parquet(f, columns=["booking_date"] + CATEGORICAL_FEATURES) for f in booking_files],
+        [
+            pd.read_parquet(f, columns=["booking_date", *CATEGORICAL_FEATURES])
+            for f in booking_files
+        ],
         ignore_index=True,
     )
     all_bookings["booking_date_dt"] = pd.to_datetime(all_bookings["booking_date"]).dt.date
@@ -133,7 +143,7 @@ def run(date: str) -> dict[str, Any]:
 
     Appends the result record to data_dir() / "agent-results" / f"{date}.jsonl".
     """
-    curr_date = datetime.date.fromisoformat(date)
+    datetime.date.fromisoformat(date)
 
     # Load training data - use a fixed cutoff that matches the production model
     # For now, use the same logic as drift check: train on data before 2016-07-01
@@ -145,7 +155,12 @@ def run(date: str) -> dict[str, Any]:
 
     if len(training_data) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -155,7 +170,12 @@ def run(date: str) -> dict[str, Any]:
 
     if len(serving_data) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -180,8 +200,8 @@ def run(date: str) -> dict[str, Any]:
         if len(train_series) < MIN_SAMPLES or len(serve_series) < MIN_SAMPLES:
             features_detail[feat] = {
                 "psi": None,
-                "train_samples": int(len(train_series)),
-                "serve_samples": int(len(serve_series)),
+                "train_samples": len(train_series),
+                "serve_samples": len(serve_series),
                 "enough_data": False,
             }
             continue
@@ -191,8 +211,8 @@ def run(date: str) -> dict[str, Any]:
 
         features_detail[feat] = {
             "psi": psi_val,
-            "train_samples": int(len(train_series)),
-            "serve_samples": int(len(serve_series)),
+            "train_samples": len(train_series),
+            "serve_samples": len(serve_series),
             "enough_data": enough_data,
         }
 
@@ -215,7 +235,12 @@ def run(date: str) -> dict[str, Any]:
         detail["worst_feature"] = worst_feature
 
     record = {
-        "check": CHECK_NAME,
+        "check_id": CHECK_ID,
+        "origin": "agent",
+        "category": CATEGORY,
+        "subject": SUBJECT,
+        "model": MODEL,
+        "source_ref": SOURCE_REF,
         "fired": fired,
         "value": value,
         "threshold": float(THRESHOLD),

@@ -37,11 +37,11 @@ def write_agent_result_line(date: str, record: dict[str, Any]) -> dict[str, Any]
     """
     ran_at = datetime.datetime.now(datetime.UTC).isoformat()
     stamped: dict[str, Any] = {}
-    if "check" in record:
-        stamped["check"] = record["check"]
+    if "check_id" in record:
+        stamped["check_id"] = record["check_id"]
     stamped["ran_at"] = ran_at
     for k, v in record.items():
-        if k != "check" and k != "ran_at":
+        if k not in ("check_id", "ran_at"):
             stamped[k] = v
 
     res_dir = data_dir() / "agent-results"

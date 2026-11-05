@@ -12,8 +12,26 @@ from hotel_demo.monitoring import write_agent_result_line
 from hotel_demo.paths import data_dir
 
 CHECK_NAME = "segment_accuracy"
+CHECK_ID = "segment_accuracy"
+CATEGORY = "model_performance"
+SUBJECT = "hotel-cancellation v1"
+MODEL = "hotel-cancellation"
+SOURCE_REF = "src/hotel_demo/agent_checks/segment_accuracy.py"
 THRESHOLD = 0.60
 MIN_SAMPLES_PER_SEGMENT = 20  # minimum labels per segment to evaluate
+
+
+def _base_record(ran_at: str) -> dict[str, Any]:
+    """Build a record with the fields required by RegisterCheck record shape."""
+    return {
+        "check_id": CHECK_ID,
+        "origin": "agent",
+        "category": CATEGORY,
+        "subject": SUBJECT,
+        "model": MODEL,
+        "source_ref": SOURCE_REF,
+        "ran_at": ran_at,
+    }
 
 
 def _matured_booking_ids(curr_date: datetime.date) -> pd.Series:
@@ -23,7 +41,10 @@ def _matured_booking_ids(curr_date: datetime.date) -> pd.Series:
     if not booking_files:
         return pd.Series(dtype="int64")
     bookings = pd.concat(
-        [pd.read_parquet(f, columns=["booking_id", "arrival_date", "hotel", "market_segment"]) for f in booking_files],
+        [
+            pd.read_parquet(f, columns=["booking_id", "arrival_date", "hotel", "market_segment"])
+            for f in booking_files
+        ],
         ignore_index=True,
     )
     arrival = pd.to_datetime(bookings["arrival_date"]).dt.date
@@ -38,7 +59,10 @@ def _load_booking_segments() -> pd.DataFrame:
     if not booking_files:
         return pd.DataFrame(columns=["booking_id", "hotel", "market_segment"])
     bookings = pd.concat(
-        [pd.read_parquet(f, columns=["booking_id", "hotel", "market_segment"]) for f in booking_files],
+        [
+            pd.read_parquet(f, columns=["booking_id", "hotel", "market_segment"])
+            for f in booking_files
+        ],
         ignore_index=True,
     )
     return bookings.drop_duplicates(subset=["booking_id"], keep="last")
@@ -65,7 +89,12 @@ def run(date: str) -> dict[str, Any]:
     matured_ids = _matured_booking_ids(curr_date)
     if len(matured_ids) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -86,7 +115,12 @@ def run(date: str) -> dict[str, Any]:
 
     if len(window_labels) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -99,7 +133,12 @@ def run(date: str) -> dict[str, Any]:
 
     if len(window_labels) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -116,7 +155,12 @@ def run(date: str) -> dict[str, Any]:
 
     if len(all_preds) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -134,7 +178,12 @@ def run(date: str) -> dict[str, Any]:
 
     if len(merged) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -146,7 +195,12 @@ def run(date: str) -> dict[str, Any]:
     segments = _load_booking_segments()
     if len(segments) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -159,7 +213,12 @@ def run(date: str) -> dict[str, Any]:
 
     if len(merged) == 0:
         record = {
-            "check": CHECK_NAME,
+            "check_id": CHECK_ID,
+            "origin": "agent",
+            "category": CATEGORY,
+            "subject": SUBJECT,
+            "model": MODEL,
+            "source_ref": SOURCE_REF,
             "fired": False,
             "value": None,
             "threshold": float(THRESHOLD),
@@ -184,10 +243,14 @@ def run(date: str) -> dict[str, Any]:
     worst_accuracy = 1.0
 
     for group_col in ["hotel", "market_segment"]:
-        group_results = merged.groupby(group_col, observed=False).agg(
-            total=("correct", "size"),
-            correct=("correct", "sum"),
-        ).reset_index()
+        group_results = (
+            merged.groupby(group_col, observed=False)
+            .agg(
+                total=("correct", "size"),
+                correct=("correct", "sum"),
+            )
+            .reset_index()
+        )
 
         for _, row in group_results.iterrows():
             segment_name = str(row[group_col])
@@ -226,7 +289,12 @@ def run(date: str) -> dict[str, Any]:
         detail["worst_segment"] = worst_segment
 
     record = {
-        "check": CHECK_NAME,
+        "check_id": CHECK_ID,
+        "origin": "agent",
+        "category": CATEGORY,
+        "subject": SUBJECT,
+        "model": MODEL,
+        "source_ref": SOURCE_REF,
         "fired": fired,
         "value": value,
         "threshold": float(THRESHOLD),
