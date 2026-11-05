@@ -9,10 +9,29 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 from hotel_demo.features import MODEL_ALIAS, MODEL_NAME
-from hotel_demo.paths import tracking_uri
+from hotel_demo.paths import data_dir, tracking_uri
 
 CHECK_NAME = "missing_evaluation"
 MAX_AGE_DAYS = 7  # evaluation older than this is considered stale
+
+
+def _write_agent_results_line(date: str, record: dict[str, Any]) -> dict[str, Any]:
+    """Stamp ran_at (current UTC ISO-8601) and append record to agent-results/<date>.jsonl."""
+    ran_at = datetime.datetime.now(datetime.UTC).isoformat()
+    stamped: dict[str, Any] = {}
+    stamped["check_id"] = CHECK_NAME
+    stamped["origin"] = "agent"
+    stamped["ran_at"] = ran_at
+    for k, v in record.items():
+        stamped[k] = v
+
+    ar_dir = data_dir() / "agent-results"
+    ar_dir.mkdir(parents=True, exist_ok=True)
+    ar_file = ar_dir / f"{date}.jsonl"
+    with ar_file.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(stamped) + "\n")
+
+    return stamped
 
 
 def run(date: str) -> dict[str, Any]:
@@ -20,6 +39,7 @@ def run(date: str) -> dict[str, Any]:
 
     Checks if the production model has a fresh evaluation artifact.
     Fires if no evaluation exists or it's older than MAX_AGE_DAYS.
+    Never raises — returns a fired result on any error.
     """
     ran_at = datetime.datetime.now(datetime.UTC).isoformat()
 
@@ -32,52 +52,33 @@ def run(date: str) -> dict[str, Any]:
         version = mv.version
         run_id = mv.run_id
     except mlflow.exceptions.MlflowException:
-        return {
-            "check_id": CHECK_NAME,
-            "origin": "agent",
-            "ran_at": ran_at,
-            "fired": True,
-            "value": None,
-            "threshold": MAX_AGE_DAYS,
-            "category": "operational",
-            "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
-            "model": "hotel-cancellation",
-            "detail": {"reason": "no production alias", "version": None},
-            "source_ref": "checks/missing_evaluation.py",
-            "version": None,
-            "not_enough_data": False,
-        }
+        return _write_agent_results_line(
+            date,
+            {
+                "check_id": CHECK_NAME,
+                "origin": "agent",
+                "ran_at": ran_at,
+                "fired": True,
+                "value": None,
+                "threshold": MAX_AGE_DAYS,
+                "category": "operational",
+                "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                "model": "hotel-cancellation",
+                "detail": {"reason": "no production alias", "version": None},
+                "source_ref": "checks/missing_evaluation.py",
+                "version": None,
+                "not_enough_data": False,
+            },
+        )
 
     # Check for evaluation artifact
     eval_artifact_path = "mlops_agents/evaluation.json"
     artifacts = client.list_artifacts(run_id, path=eval_artifact_path)
 
     if not artifacts:
-        return {
-            "check_id": CHECK_NAME,
-            "origin": "agent",
-            "ran_at": ran_at,
-            "fired": True,
-            "value": None,
-            "threshold": MAX_AGE_DAYS,
-            "category": "operational",
-            "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
-            "model": "hotel-cancellation",
-            "detail": {"reason": "no evaluation artifact", "version": version, "run_id": run_id},
-            "source_ref": "checks/missing_evaluation.py",
-            "version": None,
-            "not_enough_data": False,
-        }
-
-    # Download and parse the evaluation artifact to check its timestamp
-    try:
-        local_path = client.download_artifacts(run_id, eval_artifact_path)
-        with Path(local_path).open() as f:
-            eval_data = json.load(f)
-
-        eval_time_str = eval_data.get("evaluated_at") or eval_data.get("ran_at")
-        if not eval_time_str:
-            return {
+        return _write_agent_results_line(
+            date,
+            {
                 "check_id": CHECK_NAME,
                 "origin": "agent",
                 "ran_at": ran_at,
@@ -88,73 +89,120 @@ def run(date: str) -> dict[str, Any]:
                 "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
                 "model": "hotel-cancellation",
                 "detail": {
-                    "reason": "evaluation missing timestamp",
+                    "reason": "no evaluation artifact",
                     "version": version,
                     "run_id": run_id,
                 },
                 "source_ref": "checks/missing_evaluation.py",
                 "version": None,
                 "not_enough_data": False,
-            }
+            },
+        )
+
+    # Download and parse the evaluation artifact to check its timestamp
+    try:
+        local_path = client.download_artifacts(run_id, eval_artifact_path)
+        with Path(local_path).open() as f:
+            eval_data = json.load(f)
+
+        eval_time_str = eval_data.get("evaluated_at") or eval_data.get("ran_at")
+        if not eval_time_str:
+            return _write_agent_results_line(
+                date,
+                {
+                    "check_id": CHECK_NAME,
+                    "origin": "agent",
+                    "ran_at": ran_at,
+                    "fired": True,
+                    "value": None,
+                    "threshold": MAX_AGE_DAYS,
+                    "category": "operational",
+                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "model": "hotel-cancellation",
+                    "detail": {
+                        "reason": "evaluation missing timestamp",
+                        "version": version,
+                        "run_id": run_id,
+                    },
+                    "source_ref": "checks/missing_evaluation.py",
+                    "version": None,
+                    "not_enough_data": False,
+                },
+            )
 
         eval_time = datetime.datetime.fromisoformat(eval_time_str.replace("Z", "+00:00"))
         age_days = (datetime.datetime.now(datetime.UTC) - eval_time).days
 
         if age_days > MAX_AGE_DAYS:
-            return {
+            return _write_agent_results_line(
+                date,
+                {
+                    "check_id": CHECK_NAME,
+                    "origin": "agent",
+                    "ran_at": ran_at,
+                    "fired": True,
+                    "value": age_days,
+                    "threshold": MAX_AGE_DAYS,
+                    "category": "operational",
+                    "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                    "model": "hotel-cancellation",
+                    "detail": {
+                        "reason": "evaluation stale",
+                        "age_days": age_days,
+                        "version": version,
+                        "evaluated_at": eval_time_str,
+                    },
+                    "source_ref": "checks/missing_evaluation.py",
+                    "version": None,
+                    "not_enough_data": False,
+                },
+            )
+
+        return _write_agent_results_line(
+            date,
+            {
                 "check_id": CHECK_NAME,
                 "origin": "agent",
                 "ran_at": ran_at,
-                "fired": True,
+                "fired": False,
                 "value": age_days,
                 "threshold": MAX_AGE_DAYS,
                 "category": "operational",
                 "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
                 "model": "hotel-cancellation",
+                "detail": {"age_days": age_days, "version": version, "evaluated_at": eval_time_str},
+                "source_ref": "checks/missing_evaluation.py",
+                "version": None,
+                "not_enough_data": False,
+            },
+        )
+
+    except Exception as e:
+        return _write_agent_results_line(
+            date,
+            {
+                "check_id": CHECK_NAME,
+                "origin": "agent",
+                "ran_at": ran_at,
+                "fired": True,
+                "value": None,
+                "threshold": MAX_AGE_DAYS,
+                "category": "operational",
+                "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
+                "model": "hotel-cancellation",
                 "detail": {
-                    "reason": "evaluation stale",
-                    "age_days": age_days,
+                    "reason": f"error reading evaluation: {e}",
                     "version": version,
-                    "evaluated_at": eval_time_str,
+                    "run_id": run_id,
                 },
                 "source_ref": "checks/missing_evaluation.py",
                 "version": None,
                 "not_enough_data": False,
-            }
-
-        return {
-            "check_id": CHECK_NAME,
-            "origin": "agent",
-            "ran_at": ran_at,
-            "fired": False,
-            "value": age_days,
-            "threshold": MAX_AGE_DAYS,
-            "category": "operational",
-            "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
-            "model": "hotel-cancellation",
-            "detail": {"age_days": age_days, "version": version, "evaluated_at": eval_time_str},
-            "source_ref": "checks/missing_evaluation.py",
-            "version": None,
-            "not_enough_data": False,
-        }
-
-    except Exception as e:
-        return {
-            "check_id": CHECK_NAME,
-            "origin": "agent",
-            "ran_at": ran_at,
-            "fired": True,
-            "value": None,
-            "threshold": MAX_AGE_DAYS,
-            "category": "operational",
-            "subject": f"model {MODEL_NAME}@{MODEL_ALIAS}",
-            "model": "hotel-cancellation",
-            "detail": {
-                "reason": f"error reading evaluation: {e}",
-                "version": version,
-                "run_id": run_id,
             },
-            "source_ref": "checks/missing_evaluation.py",
-            "version": None,
-            "not_enough_data": False,
-        }
+        )
+
+
+if __name__ == "__main__":
+    import sys
+
+    run(sys.argv[1] if len(sys.argv) > 1 else str(datetime.date.today()))
