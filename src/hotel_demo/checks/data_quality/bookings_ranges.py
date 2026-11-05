@@ -17,7 +17,7 @@ RANGES = {
     "arrival_week": (1, 53),
     "stays_in_weekend_nights": (0, 19),
     "stays_in_week_nights": (0, 50),
-    "adults": (1, 55),  # 0 is invalid for a booking
+    "adults": (0, 55),  # 0 appears in training data
     "children": (0, 10),
     "babies": (0, 10),
     "is_repeated_guest": (0, 1),
