@@ -28,3 +28,26 @@ def write_monitoring_line(date: str, record: dict[str, Any]) -> dict[str, Any]:
         f.write(json.dumps(stamped) + "\n")
 
     return stamped
+
+
+def write_agent_result_line(date: str, record: dict[str, Any]) -> dict[str, Any]:
+    """Stamp ran_at (current UTC ISO-8601) and append record to agent-results/<date>.jsonl.
+
+    Returns the stamped record.
+    """
+    ran_at = datetime.datetime.now(datetime.UTC).isoformat()
+    stamped: dict[str, Any] = {}
+    if "check_id" in record:
+        stamped["check_id"] = record["check_id"]
+    stamped["ran_at"] = ran_at
+    for k, v in record.items():
+        if k not in ("check_id", "ran_at"):
+            stamped[k] = v
+
+    res_dir = data_dir() / "agent-results"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    res_file = res_dir / f"{date}.jsonl"
+    with res_file.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(stamped) + "\n")
+
+    return stamped
